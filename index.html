@@ -80,7 +80,7 @@
         color: #333;
     }
 
-    input {
+    input, select {
         padding: 12px;
         border: 2px solid #ddd;
         border-radius: 8px;
@@ -88,7 +88,7 @@
         transition: border-color 0.3s;
     }
 
-    input:focus {
+    input:focus, select:focus {
         outline: none;
         border-color: #667eea;
     }
@@ -149,7 +149,7 @@
             grid-template-columns: 1fr;
         }
 
-        input {
+        input, select {
             font-size: 16px;
         }
     }
@@ -188,6 +188,10 @@
 
         <div class="form-grid">
             <div class="form-group">
+                <label for="customTemp">额定Tℓ温度（°C）</label>
+                <input type="number" id="customTemp" placeholder="例如: 184, 192, 216">
+            </div>
+            <div class="form-group">
                 <label for="startDate">开始日期</label>
                 <input type="date" id="startDate">
             </div>
@@ -211,19 +215,25 @@
 
 <script>
     const testStages = [
-        { name: 'A', duration: 336, temp: 35, type: '2周' },
-        { name: 'B', duration: 336, temp: 25, type: '2周' },
-        { name: 'C', duration: 168, temp: 20, type: '1周' },
-        { name: 'D', duration: 168, temp: 15, type: '1周' },
-        { name: 'E', duration: 168, temp: 10, type: '1周' },
-        { name: 'F', duration: 168, temp: 5, type: '1周' },
-        { name: 'G', duration: 24, temp: 'Tc+5K', type: '1天' }
+        { name: 'A', duration: 336, tempOffset: 35, type: '2周' },
+        { name: 'B', duration: 336, tempOffset: 25, type: '2周' },
+        { name: 'C', duration: 168, tempOffset: 20, type: '1周' },
+        { name: 'D', duration: 168, tempOffset: 15, type: '1周' },
+        { name: 'E', duration: 168, tempOffset: 10, type: '1周' },
+        { name: 'F', duration: 168, tempOffset: 5, type: '1周' },
+        { name: 'G', duration: 24, tempOffset: -5, type: '1天' }  // Tℓ + 5K
     ];
 
     function calculate() {
+        const tl = parseFloat(document.getElementById('customTemp').value);
         const startDate = document.getElementById('startDate').value;
         const startTime = document.getElementById('startTime').value;
         const totalHoursInput = parseFloat(document.getElementById('totalHours').value);
+
+        if (isNaN(tl)) {
+            alert('请输入额定Tℓ温度');
+            return;
+        }
 
         if (!startDate || !startTime || isNaN(totalHoursInput)) {
             alert('请填写所有必填项');
@@ -281,8 +291,13 @@
         }
 
         if (!currentStage) {
-            currentStage = { name: '已完成', duration: 0, temp: '-' };
+            currentStage = { name: '已完成', duration: 0, tempOffset: 0 };
         }
+
+        // 计算当前阶段温度
+        const currentStageTemp = currentStage.name === 'G' 
+            ? `${tl + currentStage.tempOffset}°C (Tℓ+5K)` 
+            : `${tl - currentStage.tempOffset}°C (Tℓ-${currentStage.tempOffset}K)`;
 
         // 计算各阶段的开始和结束时间
         const stageTimeline = [];
@@ -293,7 +308,6 @@
             const stageStart = new Date(prevEndDate);
             accHours += stage.duration;
             
-            // 计算该阶段结束时间和冷却次数
             let stageEndDate = new Date(start);
             let runHours = 0;
             let stageCoolingCount = 0;
@@ -323,6 +337,11 @@
             const isCompleted = accHours <= actualRunHours;
             const isCurrent = accHours > actualRunHours && (accHours - stage.duration) < actualRunHours;
 
+            // 计算阶段温度
+            const stageTemp = stage.name === 'G' 
+                ? `${tl + stage.tempOffset}°C (Tℓ+5K)` 
+                : `${tl - stage.tempOffset}°C (Tℓ-${stage.tempOffset}K)`;
+
             stageTimeline.push({
                 name: stage.name,
                 duration: stage.duration,
@@ -331,6 +350,7 @@
                 endDate: stageEndDate,
                 durationDays: duration,
                 coolingCount: stageCoolingCount,
+                temperature: stageTemp,
                 isCompleted: isCompleted,
                 isCurrent: isCurrent
             });
@@ -353,7 +373,7 @@
                     </div>
                     <div style="background: rgba(255,255,255,0.1); padding: 12px; border-radius: 6px;">
                         <div style="font-size: 0.8em; opacity: 0.8;">阶段温度</div>
-                        <div style="font-size: 1.4em; font-weight: bold;">${currentStage.temp}°K</div>
+                        <div style="font-size: 1.2em; font-weight: bold;">${currentStageTemp}</div>
                     </div>
                     <div style="background: rgba(255,255,255,0.1); padding: 12px; border-radius: 6px;">
                         <div style="font-size: 0.8em; opacity: 0.8;">阶段进度</div>
@@ -368,6 +388,9 @@
 
             <div class="card">
                 <h3 style="margin-bottom: 15px;">⏱️ 时间信息</h3>
+                <div style="padding: 10px; background: #fff5f5; border-radius: 6px; margin-bottom: 10px;">
+                    <strong>🌡️ 额定Tℓ温度：</strong> ${tl}°C
+                </div>
                 <div style="padding: 10px; background: #fff5f5; border-radius: 6px; margin-bottom: 10px;">
                     <strong>📥 输入的总经过时长：</strong> ${totalHoursInput} 小时
                 </div>
@@ -388,7 +411,7 @@
             <div class="card" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">
                 <h3 style="margin-bottom: 15px; color: #333;">🗓️ 各阶段时间明细</h3>
                 <div style="background: rgba(255,255,255,0.7); padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 0.9em; color: #333;">
-                    <strong>📌 说明：</strong>显示每个阶段的开始时间和结束时间（已包含冷却时间的影响）
+                    <strong>📌 说明：</strong>显示每个阶段的开始时间、结束时间和温度（已包含冷却时间的影响）
                 </div>
         `;
 
@@ -410,6 +433,9 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <div style="font-size: 1.1em; font-weight: bold; color: ${statusColor};">阶段 ${st.name}</div>
                         <div style="color: ${statusColor}; font-weight: 600;">${statusText}</div>
+                    </div>
+                    <div style="padding: 10px; background: rgba(255, 165, 0, 0.1); border-radius: 6px; margin-bottom: 10px; border-left: 3px solid #ff9800;">
+                        <strong>🌡️ 测试温度：</strong><span style="font-size: 1.1em; color: #e65100;">${st.temperature}</span>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.9em;">
                         <div><strong>本阶段时长：</strong>${st.duration}h</div>
